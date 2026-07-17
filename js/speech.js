@@ -30,11 +30,11 @@ const Speech = {
       ("webkitSpeechRecognition" in window || "SpeechRecognition" in window);
   },
 
-  // Listen once; calls cb(transcript) or errCb(err).
-  listen(cb, errCb){
+  // Listen once; calls cb(transcript) or errCb(err). lang defaults to Spanish.
+  listen(cb, errCb, lang = "es-ES"){
     const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
     const r = new Rec();
-    r.lang = "es-ES";
+    r.lang = lang;
     r.interimResults = false;
     r.maxAlternatives = 3;
     let got = false;

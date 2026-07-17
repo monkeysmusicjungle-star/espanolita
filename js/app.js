@@ -24,7 +24,8 @@ function go(view, arg){
   currentView = view;
   window.scrollTo(0, 0);
   const views = { home: viewHome, practice: () => startSession(), speak: viewSpeak, songs: viewSongs,
-                  song: viewSong, addsong: viewAddSong, settings: viewSettings };
+                  song: viewSong, addsong: viewAddSong, settings: viewSettings,
+                  crossword: viewCrossword, translate: viewTranslate, ai: viewAI };
   (views[view] || viewHome)(arg);
   document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.v === view));
 }
@@ -131,6 +132,9 @@ function viewHome(){
       <button onclick="go('speak')">🎤<br>Speaking</button>
       <button onclick="go('songs')">🎵<br>Songs</button>
       <button onclick="startSession('grammar')">📖<br>Grammar drill</button>
+      <button onclick="go('crossword')">🧩<br>Crossword</button>
+      <button onclick="go('translate')">🔄<br>Translate</button>
+      <button onclick="go('ai')">🤖<br>AI Tutor</button>
     </div>
 
     ${weak.length ? `<div class="card">
