@@ -109,6 +109,30 @@ h3 { margin-bottom: 8px; }
   border-radius: 8px; font-size: 1.05rem; width: 38px; height: 38px; cursor: pointer;
 }
 
+.pinlock { justify-content: center; min-height: 80vh; }
+.pindots { display: flex; gap: 16px; justify-content: center; margin: 18px 0 26px; }
+.pindots span {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--brand); background: transparent;
+}
+.pindots span.fill { background: var(--brand); }
+.pindots.shake { animation: pinshake .4s; }
+@keyframes pinshake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+}
+.pinpad {
+  display: grid; grid-template-columns: repeat(3, 72px); gap: 12px; justify-content: center;
+}
+.pinpad button {
+  height: 72px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--card); font-size: 1.5rem; font-weight: 600; color: var(--ink);
+  cursor: pointer; font-family: inherit;
+}
+.pinpad button:active { background: var(--line); }
+.pinpad .pinback { font-size: 1.2rem; }
+
 .sessiontop { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
 .sessiontop .back { flex-shrink: 0; white-space: nowrap; }
 .sessiontop .progress { flex: 1; margin-bottom: 0; }

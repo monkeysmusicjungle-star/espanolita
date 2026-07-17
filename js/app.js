@@ -691,11 +691,61 @@ function viewSettings(){
   </div>${navBar()}`;
 }
 
+/* ---------------- PIN lock ---------------- */
+// Deterrent lock, not bank-grade security: keeps strangers who find the URL out.
+// The device remembers a successful unlock, so the owner types it only once.
+const PIN_HASH = 2086133284;
+function pinHash(s){ let h = 5381; for (const c of s) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return h; }
+
+let pinEntry = "";
+function viewPinLock(){
+  pinEntry = "";
+  APP.innerHTML = `
+  <div class="screen center pinlock">
+    <div class="hero">🔒</div>
+    <h1>¡Españolita!</h1>
+    <p class="sub">Enter your PIN to unlock</p>
+    <div class="pindots" id="pindots">${renderPinDots()}</div>
+    <div class="pinpad">
+      ${[1,2,3,4,5,6,7,8,9].map(n => `<button onclick="pinPress('${n}')">${n}</button>`).join("")}
+      <span></span>
+      <button onclick="pinPress('0')">0</button>
+      <button class="pinback" onclick="pinBackspace()">⌫</button>
+    </div>
+  </div>`;
+}
+function renderPinDots(){
+  return [0,1,2,3].map(i => `<span class="${i < pinEntry.length ? "fill" : ""}"></span>`).join("");
+}
+function pinPress(d){
+  if (pinEntry.length >= 4) return;
+  pinEntry += d;
+  $("#pindots").innerHTML = renderPinDots();
+  if (pinEntry.length === 4){
+    if (pinHash(pinEntry) === PIN_HASH){
+      localStorage.setItem("espanolita_unlocked", "yes");
+      boot();
+    } else {
+      const dots = $("#pindots");
+      dots.classList.add("shake");
+      setTimeout(() => { pinEntry = ""; dots.classList.remove("shake"); dots.innerHTML = renderPinDots(); }, 500);
+    }
+  }
+}
+function pinBackspace(){
+  pinEntry = pinEntry.slice(0, -1);
+  $("#pindots").innerHTML = renderPinDots();
+}
+
 /* ---------------- Boot ---------------- */
+function boot(){
+  if (!State.data.onboarded) setupA2English();
+  else go("home");
+}
 window.addEventListener("DOMContentLoaded", () => {
   State.load();
   Speech.init();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
-  if (!State.data.onboarded) setupA2English();
-  else go("home");
+  if (localStorage.getItem("espanolita_unlocked") === "yes") boot();
+  else viewPinLock();
 });
