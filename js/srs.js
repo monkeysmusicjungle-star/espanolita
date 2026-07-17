@@ -18,6 +18,7 @@ const State = {
       recent: [],              // last answers (1/0) for adaptive difficulty
       userSongs: [],           // songs the user pasted in
       songVideos: {},          // songId -> youtube video id
+      songLyrics: {},          // builtin songId -> pasted lines [{es}]
       stats: { answers: 0, correct: 0, days: {} }
     };
   },

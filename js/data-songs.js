@@ -3,6 +3,20 @@
 // stored in localStorage, never here, because their lyrics are copyrighted.
 // video: none built in — the user pastes a YouTube link per song and we embed it.
 const SONGS = [
+  // Popular songs: video is built in; lyrics are copyrighted, so the user
+  // pastes them once (stored in localStorage) and all exercises unlock.
+  {
+    id:"s_flaca", kind:"pop", lv:"A2", vid:"UCF9oHXhDMU",
+    title:"Flaca", artist:"Andrés Calamaro",
+    aboutEn:"The Argentine rock classic (1997) — slow, clear vocals, great for learning.",
+    lines:[]
+  },
+  {
+    id:"s_manana", kind:"pop", lv:"A2", vid:"2PVi95J-FMo",
+    title:"Yo No Sé Mañana", artist:"Luis Enrique",
+    aboutEn:"Grammy-winning salsa hit (2009) about living in the moment.",
+    lines:[]
+  },
   {
     id:"s_pollitos", kind:"folk", lv:"A1",
     title:"Los Pollitos Dicen", artist:"Traditional (children's song)",

@@ -498,6 +498,24 @@ async function toggleRecord(){
 /* ---------------- Songs ---------------- */
 function allSongs(){ return [...SONGS, ...State.data.userSongs]; }
 
+// Built-in pop songs ship without lyrics (copyright); the user pastes them once.
+function effSong(id){
+  const s = allSongs().find(x => x.id === id);
+  if (!s) return null;
+  const lines = (s.lines && s.lines.length) ? s.lines
+    : ((State.data.songLyrics || {})[s.id] || []);
+  return { ...s, lines };
+}
+
+function saveBuiltinLyrics(id){
+  const lyrics = ($("#lyr-in").value || "").trim();
+  if (!lyrics) return;
+  if (!State.data.songLyrics) State.data.songLyrics = {};
+  State.data.songLyrics[id] = lyrics.split(/\n+/).map(t => t.trim()).filter(Boolean).map(es => ({ es }));
+  State.save();
+  viewSong(id);
+}
+
 function viewSongs(){
   const d = State.data;
   APP.innerHTML = `<div class="screen">
@@ -514,30 +532,39 @@ function viewSongs(){
 
 let songMode = "read";
 function viewSong(id, mode){
-  const s = allSongs().find(x => x.id === id);
+  const s = effSong(id);
   if (!s) return go("songs");
   songMode = mode || "read";
-  const vid = State.data.songVideos[s.id];
-  const about = s.aboutEn ? (State.data.lang === "nl" ? s.aboutNl : s.aboutEn) : "";
+  const vid = State.data.songVideos[s.id] || s.vid;
+  const about = s.aboutEn || "";
+  const hasLyrics = s.lines.length > 0;
   APP.innerHTML = `<div class="screen">
-    <button class="back" onclick="go('songs')">← ${L("Songs","Liedjes")}</button>
+    <button class="back" onclick="go('songs')">← Songs</button>
     <h1>${esc(s.title)}</h1>
     <p class="sub">${esc(s.artist)}</p>
     ${vid
       ? `<div class="video"><iframe src="https://www.youtube-nocookie.com/embed/${esc(vid)}" allow="autoplay; encrypted-media" allowfullscreen></iframe></div>`
       : `<div class="card center">
-           <p class="sub">🎬 ${L("Paste a YouTube link of this song to play it right here:","Plak een YouTube-link van dit liedje om het hier af te spelen:")}</p>
+           <p class="sub">🎬 Paste a YouTube link of this song to play it right here:</p>
            <input id="ytin" class="tin" placeholder="https://youtube.com/watch?v=…">
-           <button class="btn" onclick="saveVideo('${esc(s.id)}')">${L("Save","Opslaan")}</button>
+           <button class="btn" onclick="saveVideo('${esc(s.id)}')">Save</button>
          </div>`}
     ${about ? `<p class="sub">${esc(about)}</p>` : ""}
+    ${hasLyrics ? `
     <div class="modes">
-      <button class="${songMode === "read" ? "on" : ""}" onclick="viewSong('${esc(s.id)}','read')">📖 ${L("Read","Lezen")}</button>
-      <button class="${songMode === "gaps" ? "on" : ""}" onclick="viewSong('${esc(s.id)}','gaps')">🕳️ ${L("Gaps","Gaten")}</button>
-      <button class="${songMode === "sing" ? "on" : ""}" onclick="viewSong('${esc(s.id)}','sing')">🎤 ${L("Sing","Zingen")}</button>
+      <button class="${songMode === "read" ? "on" : ""}" onclick="viewSong('${esc(s.id)}','read')">📖 Read</button>
+      <button class="${songMode === "gaps" ? "on" : ""}" onclick="viewSong('${esc(s.id)}','gaps')">🕳️ Gaps</button>
+      <button class="${songMode === "sing" ? "on" : ""}" onclick="viewSong('${esc(s.id)}','sing')">🎤 Sing</button>
     </div>
-    <div id="songbody"></div>
+    <div id="songbody"></div>` : `
+    <div class="card">
+      <p><b>🎼 One-time step:</b> the lyrics are copyrighted, so the app can't include them — but you can! Search for
+      “${esc(s.title)} ${esc(s.artist)} letra” on a lyrics website, copy the text, and paste it below. All exercises unlock automatically.</p>
+      <textarea id="lyr-in" class="tin" rows="9" placeholder="Paste the lyrics here…"></textarea>
+      <button class="btn big" onclick="saveBuiltinLyrics('${esc(s.id)}')">Save lyrics</button>
+    </div>`}
   </div>${navBar()}`;
+  if (!hasLyrics) return;
   if (songMode === "read") renderSongRead(s);
   if (songMode === "gaps") renderSongGaps(s);
   if (songMode === "sing") renderSongSing(s, 0);
@@ -553,7 +580,7 @@ function saveVideo(id){
 function renderSongRead(s){
   $("#songbody").innerHTML = s.lines.map((l, i) => `
     <div class="songline">
-      <p class="es">${esc(l.es)} <button class="say" onclick="Speech.say(allSongs().find(x=>x.id==='${esc(s.id)}').lines[${i}].es)">🔊</button></p>
+      <p class="es">${esc(l.es)} <button class="say" onclick="Speech.say(effSong('${esc(s.id)}').lines[${i}].es)">🔊</button></p>
       ${l.en ? `<p class="sub">${esc(State.data.lang === "nl" && l.nl ? l.nl : l.en)}</p>` : ""}
     </div>`).join("");
 }
@@ -626,13 +653,13 @@ function renderSongSing(s, i){
         ${hasRec ? `<button class="btn rec" onclick="singListen('${esc(s.id)}', ${i})">🎙️</button>` : ""}
       </div>
       <div id="sp-result"></div>
-      <button class="btn big" onclick="renderSongSing(allSongs().find(x=>x.id==='${esc(s.id)}'), ${i + 1})">Next line →</button>
+      <button class="btn big" onclick="renderSongSing(effSong('${esc(s.id)}'), ${i + 1})">Next line →</button>
       ${inPlanFlow === "song" ? `<button class="btn ghost" onclick="completePlanStep('song')">✅ Done for today</button>` : ""}
     </div>`;
   Speech.say(l.es);
 }
 function singListen(id, i){
-  const s = allSongs().find(x => x.id === id);
+  const s = effSong(id);
   const l = s.lines[i];
   $("#sp-result").innerHTML = `<p class="sub">👂 ${L("Listening…","Ik luister…")}</p>`;
   Speech.listen(alts => {
