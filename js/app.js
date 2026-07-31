@@ -507,13 +507,43 @@ function effSong(id){
   return { ...s, lines };
 }
 
-function saveBuiltinLyrics(id){
+// Translate song lines Spanish→English one by one (free MyMemory service).
+async function translateLinesToEn(lines, statusEl){
+  for (let i = 0; i < lines.length; i++){
+    if (lines[i].en) continue;
+    if (statusEl) statusEl.textContent = `Translating… ${i + 1}/${lines.length}`;
+    try {
+      const res = await fetch("https://api.mymemory.translated.net/get?q=" +
+        encodeURIComponent(lines[i].es) + "&langpair=es|en");
+      const data = await res.json();
+      const en = (data.responseData && data.responseData.translatedText || "").trim();
+      if (en && !/QUERY LENGTH|INVALID|NO QUERY/i.test(en)) lines[i].en = en;
+    } catch(e){ break; }
+  }
+  return lines;
+}
+
+async function saveBuiltinLyrics(id){
   const lyrics = ($("#lyr-in").value || "").trim();
   if (!lyrics) return;
   if (!State.data.songLyrics) State.data.songLyrics = {};
-  State.data.songLyrics[id] = lyrics.split(/\n+/).map(t => t.trim()).filter(Boolean).map(es => ({ es }));
+  const lines = lyrics.split(/\n+/).map(t => t.trim()).filter(Boolean).map(es => ({ es }));
+  State.data.songLyrics[id] = lines;
+  State.save();
+  const btn = document.querySelector(".card .btn.big");
+  await translateLinesToEn(lines, btn);
   State.save();
   viewSong(id);
+}
+
+// For songs whose lyrics were saved before translations existed.
+async function songAddTranslations(id){
+  const stored = (State.data.songLyrics || {})[id] ||
+    (State.data.userSongs.find(s => s.id === id) || {}).lines;
+  if (!stored) return;
+  await translateLinesToEn(stored, $("#trbtn"));
+  State.save();
+  viewSong(id, "read");
 }
 
 function viewSongs(){
@@ -578,10 +608,13 @@ function saveVideo(id){
 }
 
 function renderSongRead(s){
-  $("#songbody").innerHTML = s.lines.map((l, i) => `
+  const missingEn = s.lines.some(l => !l.en);
+  $("#songbody").innerHTML =
+    (missingEn ? `<button class="btn ghost" id="trbtn" onclick="songAddTranslations('${esc(s.id)}')">🔤 Add English translations</button>` : "") +
+    s.lines.map((l, i) => `
     <div class="songline">
       <p class="es">${esc(l.es)} <button class="say" onclick="Speech.say(effSong('${esc(s.id)}').lines[${i}].es)">🔊</button></p>
-      ${l.en ? `<p class="sub">${esc(State.data.lang === "nl" && l.nl ? l.nl : l.en)}</p>` : ""}
+      ${l.en ? `<p class="sub">${esc(l.en)}</p>` : ""}
     </div>`).join("");
 }
 
@@ -689,12 +722,14 @@ function viewAddSong(){
     </div>
   </div>${navBar()}`;
 }
-function saveSong(){
+async function saveSong(){
   const title = ($("#s-title").value || "").trim();
   const lyrics = ($("#s-lyrics").value || "").trim();
   if (!title || !lyrics) return;
   const id = "u_" + Date.now();
   const lines = lyrics.split(/\n+/).map(t => t.trim()).filter(Boolean).map(es => ({ es }));
+  const btn = document.querySelector(".card .btn.big");
+  await translateLinesToEn(lines, btn);
   State.data.userSongs.push({ id, kind: "user", title, artist: ($("#s-artist").value || "").trim() || "—", lines });
   const url = ($("#s-video").value || "").trim();
   const m = url.match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([\w-]{11})/);
