@@ -61,21 +61,35 @@ function setupA2English(){
 }
 
 /* ---------------- Daily plan ---------------- */
+// The recommended ~2-hour daily routine (matches the 5-week course blocks).
 const PLAN_STEPS = [
-  { key: "warmup",   icon: "🔁", title: "Warm-up review", time: "~8 min" },
-  { key: "newwords", icon: "✨", title: "New words",       time: "~7 min" },
-  { key: "grammar",  icon: "📖", title: "Grammar quiz",    time: "~5 min" },
-  { key: "speak",    icon: "🎤", title: "Speaking practice", time: "~5 min" },
-  { key: "song",     icon: "🎵", title: "Song time",       time: "~5 min" }
+  { key: "speak",    icon: "🗣️", title: "Speaking — Think mode",           mins: 30, view: "talk" },
+  { key: "newwords", icon: "🎯", title: "Vocabulary + grammar",             mins: 25, view: "practice" },
+  { key: "input",    icon: "📺", title: "Watch / listen today",             mins: 30, link: true },
+  { key: "lola",     icon: "🤖", title: "Talk with Lola — Spanish only",    mins: 20, view: "ai" },
+  { key: "fun",      icon: "🎵", title: "Song, crossword or translate",     mins: 15, view: "songs" }
 ];
 function ensurePlanToday(){
   const t = new Date().toISOString().slice(0, 10);
   const d = State.data;
   if (!d.plan || d.plan.date !== t){
-    d.plan = { date: t, steps: { warmup: false, newwords: false, grammar: false, speak: false, song: false } };
+    d.plan = { date: t, steps: { speak: false, newwords: false, input: false, lola: false, fun: false } };
     State.save();
   }
   return d.plan;
+}
+// Rotating "watch/listen today" pick — anchored on Dreaming Spanish (the top rec).
+function todaysResource(){
+  if (typeof RES === "undefined") return { label: "Dreaming Spanish", url: "https://www.dreamingspanish.com/" };
+  const wk = [RES.dreaming, RES.langtrans, RES.coffee, RES.dreaming, RES.notes, RES.dreaming, RES.slow];
+  return wk[new Date().getDay()] || RES.dreaming;
+}
+function togglePlanStep(key){
+  const plan = ensurePlanToday();
+  plan.steps[key] = !plan.steps[key];
+  if (plan.steps[key]) State.addXP(5);
+  State.save();
+  viewHome();
 }
 function completePlanStep(step){
   ensurePlanToday().steps[step] = true;
@@ -91,9 +105,10 @@ function pickTodaysSongId(){
   return list[day % list.length].id;
 }
 function startPlanStep(step){
-  if (step === "speak"){ inPlanFlow = "speak"; currentView = "speak"; return viewSpeak(); }
-  if (step === "song"){ inPlanFlow = "song"; currentView = "song"; return viewSong(pickTodaysSongId(), "sing"); }
-  return startSession(step);
+  if (step === "speak"){ return go("talk"); }
+  if (step === "lola"){ return go("ai"); }
+  if (step === "fun"){ return go("songs"); }
+  return startSession(step);   // "newwords" runs a vocab+grammar session (auto-ticks on finish)
 }
 
 /* ---------------- Home (index) ---------------- */
@@ -103,6 +118,7 @@ function viewHome(){
   const learned = SRS.learnedCount();
   const weak = SRS.weakest(4).map(id => VOCAB_BY_ID[id]).filter(Boolean);
   const doneCount = PLAN_STEPS.filter(s => plan.steps[s.key]).length;
+  const res = todaysResource();
   APP.innerHTML = `
   <div class="screen">
     <header class="top">
@@ -116,18 +132,26 @@ function viewHome(){
     </div>
 
     <button class="btn big talkbtn" onclick="go('talk')">🗣️ Hands-free speaking tutor</button>
-    <button class="btn big coursebtn" onclick="go('course')">📘 5-Week Fluency Course (2 hrs/day)</button>
+    <a class="btn big watchbtn" href="${res.url}" target="_blank" rel="noopener">📺 Watch today: ${esc(res.label)}</a>
+    <button class="btn big coursebtn" onclick="go('course')">📘 5-Week Fluency Course</button>
 
     <div class="card">
-      <h3>Today's 30-Minute Plan (${doneCount}/5)</h3>
+      <h3>Today's Plan · ~2 hours (${doneCount}/5)</h3>
       <div class="progress"><div style="width:${(doneCount / 5) * 100}%"></div></div>
-      ${PLAN_STEPS.map(s => `
-        <button class="planrow ${plan.steps[s.key] ? "done" : ""}" onclick="startPlanStep('${s.key}')">
-          <span class="pi">${plan.steps[s.key] ? "✅" : s.icon}</span>
-          <span class="pt"><b>${s.title}</b><span class="sub">${s.time}</span></span>
-          <span class="arrow">›</span>
-        </button>`).join("")}
-      ${doneCount === 5 ? `<p class="sub center">🎉 All done for today — amazing work!</p>` : ""}
+      ${PLAN_STEPS.map(s => {
+        const done = plan.steps[s.key];
+        const label = s.link ? s.title + ": " + res.label : s.title;
+        const action = s.link
+          ? `<a class="btn small" href="${res.url}" target="_blank" rel="noopener">Open ↗</a>`
+          : `<button class="btn small" onclick="startPlanStep('${s.key}')">Do it →</button>`;
+        return `<div class="courseblock">
+          <span class="cb-icon">${done ? "✅" : s.icon}</span>
+          <span class="cb-main"><b>${esc(label)}</b><span class="sub">${s.mins} min</span></span>
+          ${action}
+          <button class="tickbtn" onclick="togglePlanStep('${s.key}')" title="Mark done">${done ? "☑️" : "⬜"}</button>
+        </div>`;
+      }).join("")}
+      ${doneCount === 5 ? `<p class="sub center">🎉 Two hours done — brilliant!</p>` : ""}
     </div>
 
     <h3 class="indexTitle">Or choose freely</h3>
