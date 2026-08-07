@@ -19,6 +19,7 @@ const State = {
       userSongs: [],           // songs the user pasted in
       songVideos: {},          // songId -> youtube video id
       songLyrics: {},          // builtin songId -> pasted lines [{es}]
+      speakBand: 0,            // hands-free tutor level: 0=A1 1=A2 2=B1 3=B2
       stats: { answers: 0, correct: 0, days: {} }
     };
   },
