@@ -3,7 +3,7 @@
 "use strict";
 
 const TALK = { running: false, seq: 0, rec: null, queue: [], drill: null, attempt: 0, noHear: 0,
-               right: 0, wrong: 0, xpStart: 0 };
+               right: 0, wrong: 0, xpStart: 0, mode: "think" };
 const TALK_BANDS = ["A1", "A2", "B1", "B2"];
 
 // Speak in a given language with a callback when done (with a safety timeout,
@@ -42,13 +42,20 @@ function viewTalk(){
       from A1 all the way to B2.</p>
       <p class="sub">Your level now: <b>${band}</b> · ${mastered} sentences mastered</p>
     </div>
-    <button class="btn big rec" onclick="talkStart()">▶️ Start talking</button>
-    <p class="sub center">Works best in Chrome on Android. When it asks, tap <b>Allow</b> for the microphone. Say <b>Stop</b> or tap the button anytime to end.</p>
+    <div class="card">
+      <h3>Choose how you practise</h3>
+      <p class="sub">🧠 <b>Think mode</b> — I ask in English, you say it in Spanish yourself. Builds real fluency.</p>
+      <button class="btn big rec" onclick="talkStart('think')">🧠 Think in Spanish (recommended)</button>
+      <p class="sub">🔁 <b>Repeat mode</b> — see the Spanish and say it. Good for new or tricky sentences.</p>
+      <button class="btn big ghost" onclick="talkStart('repeat')">🔁 See & repeat</button>
+    </div>
+    <p class="sub center">Works best in Chrome on Android. When it asks, tap <b>Allow</b> for the microphone. Tap <b>Stop</b> anytime.</p>
   </div>${navBar()}`;
 }
 
 /* ---------- Session control ---------- */
-function talkStart(){
+function talkStart(mode){
+  TALK.mode = mode || TALK.mode || "think";
   TALK.running = true;
   TALK.seq++;
   TALK.right = 0; TALK.wrong = 0; TALK.xpStart = State.data.xp;
@@ -104,7 +111,7 @@ function talkAdvanceBand(){
 function talkPrompt(retry){
   if (!TALK.running) return;
   const d = TALK.drill;
-  const show = d.lv === "A1" || d.lv === "A2";   // show Spanish (read) vs hide (produce)
+  const show = TALK.mode === "repeat";   // repeat: show Spanish · think: produce from English
   const mySeq = TALK.seq;
 
   APP.innerHTML = `<div class="screen talk">
@@ -112,11 +119,11 @@ function talkPrompt(retry){
       <button class="back" onclick="talkStop()">■ Stop</button>
       <div class="progress"><div style="width:${100 * TALK.right / Math.max(1, TALK.right + TALK.wrong + TALK.queue.length + 1)}%"></div></div>
     </div>
-    <p class="sub center">${d.lv} · ${retry ? "Try again" : "Say this in Spanish"}</p>
+    <p class="sub center">${d.lv} · ${retry ? "Try again" : (show ? "Say this in Spanish" : "How do you say this in Spanish?")}</p>
     <div class="card center">
       ${show
         ? `<p class="es big-es">${esc(d.es)}</p><p class="sub">${esc(d.en)}</p>`
-        : `<p class="meaning">${esc(d.en)}</p><p class="sub">(say it in Spanish)</p>`}
+        : `<p class="meaning">${esc(d.en)}</p><p class="sub">🧠 say it in Spanish</p>`}
       <div class="talkmic" id="talk-mic">🎙️</div>
       <p class="talkstatus" id="talk-status">…</p>
       <div id="talk-fb"></div>
