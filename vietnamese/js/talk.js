@@ -5,6 +5,18 @@ const TALK = { running: false, seq: 0, rec: null, queue: [], drill: null, attemp
                right: 0, wrong: 0, xpStart: 0, recMode: false };
 const TALK_BANDS = ["A1", "A2"];
 
+// Keep the screen awake so the phone doesn't suspend the mic when set down.
+let talkWakeLock = null;
+async function talkAcquireWake(){
+  try { if ("wakeLock" in navigator) talkWakeLock = await navigator.wakeLock.request("screen"); } catch(e){}
+}
+function talkReleaseWake(){
+  try { if (talkWakeLock){ talkWakeLock.release(); talkWakeLock = null; } } catch(e){}
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && TALK.running && !talkWakeLock) talkAcquireWake();
+});
+
 function talkSpeak(text, lang, cb, rate){
   let done = false;
   const finish = () => { if (done) return; done = true; cb && cb(); };
@@ -111,6 +123,7 @@ function viewTalk(){
 function talkStart(){
   TALK.running = true;
   TALK.seq++;
+  talkAcquireWake();
   TALK.recMode = !Speech.hasRecognition();
   TALK.right = 0; TALK.wrong = 0; TALK.xpStart = State.data.xp;
   TALK.queue = talkBuildQueue();
@@ -136,6 +149,7 @@ function talkBuildQueue(){
 function talkStop(){
   TALK.running = false;
   TALK.seq++;
+  talkReleaseWake();
   try { speechSynthesis.cancel(); } catch(e){}
   try { if (TALK.rec) TALK.rec.abort(); } catch(e){}
   talkEnd(true);
@@ -199,9 +213,10 @@ function talkListen(){
   }, err => {
     if (TALK.seq !== mySeq || !TALK.running) return;
     if (mic) mic.classList.remove("live");
-    if (err === "not-allowed"){
+    if (err === "not-allowed" || err === "service-not-allowed"){
       talkStatus("🚫 " + L("Allow the microphone, then Start again.","Permite el micrófono y pulsa Empezar."), "bad");
       TALK.running = false;
+      talkReleaseWake();
       document.getElementById("talk-fb").innerHTML =
         `<button class="btn" onclick="viewMicCheck()">🔧 ${L("Fix the microphone","Arreglar el micrófono")}</button>`;
       return;
@@ -210,15 +225,17 @@ function talkListen(){
       TALK.recMode = true;  // fall back to record & compare for the rest
       return talkRecord();
     }
+    // Transient (silence, screen sleep/wake) — keep re-listening a few times.
     TALK.noHear++;
-    if (TALK.noHear >= 2){
-      talkStatus(L("Paused — I couldn't hear you.","En pausa — no te oí."), "");
-      document.getElementById("talk-fb").innerHTML =
-        `<button class="btn big" onclick="talkListen()">🎙️ ${L("Listen again","Escuchar otra vez")}</button>
-         <button class="btn ghost" onclick="talkNext()">${L("Next","Siguiente")} →</button>`;
+    if (TALK.noHear <= 4){
+      talkStatus("👂 " + L("Still listening…","Sigo escuchando…"), "live");
+      setTimeout(() => { if (TALK.seq === mySeq && TALK.running) talkListen(); }, 500);
       return;
     }
-    talkSpeak(L("I didn't hear you. Try again.","No te oí. Otra vez."), tuiLang(), () => { if (TALK.seq === mySeq) talkListen(); });
+    talkStatus(L("Paused — tap to keep going.","En pausa — toca para seguir."), "");
+    document.getElementById("talk-fb").innerHTML =
+      `<button class="btn big rec" onclick="TALK.noHear=0;talkAcquireWake();talkListen()">🎙️ ${L("Resume","Seguir")}</button>
+       <button class="btn ghost" onclick="talkNext()">${L("Next","Siguiente")} →</button>`;
   });
 }
 
@@ -315,6 +332,7 @@ function talkSkip(){
 
 function talkEnd(stopped){
   TALK.running = false;
+  talkReleaseWake();
   const earned = State.data.xp - TALK.xpStart;
   APP.innerHTML = `<div class="screen center">
     <div class="hero">🗣️</div>

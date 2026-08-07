@@ -6,6 +6,20 @@ const TALK = { running: false, seq: 0, rec: null, queue: [], drill: null, attemp
                right: 0, wrong: 0, xpStart: 0, mode: "think" };
 const TALK_BANDS = ["A1", "A2", "B1", "B2"];
 
+// Keep the screen awake so Android doesn't suspend the microphone when you
+// put the phone down. Wake locks drop when the page is hidden, so re-acquire
+// on return.
+let talkWakeLock = null;
+async function talkAcquireWake(){
+  try { if ("wakeLock" in navigator) talkWakeLock = await navigator.wakeLock.request("screen"); } catch(e){}
+}
+function talkReleaseWake(){
+  try { if (talkWakeLock){ talkWakeLock.release(); talkWakeLock = null; } } catch(e){}
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && TALK.running && !talkWakeLock) talkAcquireWake();
+});
+
 // Speak in a given language with a callback when done (with a safety timeout,
 // because some phones don't fire 'onend' reliably).
 function talkSpeak(text, lang, cb, rate){
@@ -49,7 +63,7 @@ function viewTalk(){
       <p class="sub">🔁 <b>Repeat mode</b> — see the Spanish and say it. Good for new or tricky sentences.</p>
       <button class="btn big ghost" onclick="talkStart('repeat')">🔁 See & repeat</button>
     </div>
-    <p class="sub center">Works best in Chrome on Android. When it asks, tap <b>Allow</b> for the microphone. Tap <b>Stop</b> anytime.</p>
+    <p class="sub center">Works best in Chrome on Android. When it asks, tap <b>Allow</b> for the microphone. The screen stays awake while you practise, so you can set the phone down. Tap <b>Stop</b> anytime.</p>
   </div>${navBar()}`;
 }
 
@@ -58,6 +72,7 @@ function talkStart(mode){
   TALK.mode = mode || TALK.mode || "think";
   TALK.running = true;
   TALK.seq++;
+  talkAcquireWake();
   TALK.right = 0; TALK.wrong = 0; TALK.xpStart = State.data.xp;
   TALK.queue = talkBuildQueue();
   talkNext();
@@ -82,6 +97,7 @@ function talkBuildQueue(){
 function talkStop(){
   TALK.running = false;
   TALK.seq++;
+  talkReleaseWake();
   try { speechSynthesis.cancel(); } catch(e){}
   try { if (TALK.rec) TALK.rec.abort(); } catch(e){}
   talkEnd(true);
@@ -153,21 +169,24 @@ function talkListen(){
   }, err => {
     if (TALK.seq !== mySeq || !TALK.running) return;
     if (mic) mic.classList.remove("live");
-    if (err === "not-allowed"){
+    if (err === "not-allowed" || err === "service-not-allowed"){
       talkStatus("🚫 Please allow the microphone, then press Start again.", "bad");
       TALK.running = false;
+      talkReleaseWake();
       return;
     }
-    // Didn't hear anything.
+    // Transient (silence, screen sleep/wake, brief network) — keep the loop
+    // alive by re-listening a few times before offering a one-tap resume.
     TALK.noHear++;
-    if (TALK.noHear >= 2){
-      talkStatus("Paused — I couldn't hear you.", "");
-      document.getElementById("talk-fb").innerHTML =
-        `<button class="btn big" onclick="talkListen()">🎙️ I'm ready, listen again</button>
-         <button class="btn ghost" onclick="talkNext()">Next sentence →</button>`;
+    if (TALK.noHear <= 4){
+      talkStatus("👂 Still listening… say it now", "live");
+      setTimeout(() => { if (TALK.seq === mySeq && TALK.running) talkListen(); }, 500);
       return;
     }
-    talkSpeak("I didn't hear you. Try again.", "en-US", () => { if (TALK.seq === mySeq) talkListen(); });
+    talkStatus("Paused — tap to keep going.", "");
+    document.getElementById("talk-fb").innerHTML =
+      `<button class="btn big rec" onclick="TALK.noHear=0;talkAcquireWake();talkListen()">🎙️ Resume</button>
+       <button class="btn ghost" onclick="talkNext()">Next sentence →</button>`;
   });
 }
 
@@ -242,6 +261,7 @@ function talkSkip(){
 
 function talkEnd(stopped){
   TALK.running = false;
+  talkReleaseWake();
   const earned = State.data.xp - TALK.xpStart;
   const total = TALK.right + TALK.wrong;
   APP.innerHTML = `<div class="screen center">
