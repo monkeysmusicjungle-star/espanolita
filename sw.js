@@ -1,9 +1,9 @@
 // Service worker: cache the app shell so it opens instantly and works offline.
-const CACHE = "espanolita-v6";
+const CACHE = "espanolita-v7";
 const ASSETS = [
   ".", "index.html", "css/style.css",
   "js/data-vocab.js", "js/data-grammar.js", "js/data-songs.js", "js/data-talk.js",
-  "js/srs.js", "js/speech.js", "js/app.js", "js/extras.js", "js/talk.js",
+  "js/srs.js", "js/speech.js", "js/app.js", "js/extras.js", "js/talk.js", "js/course.js",
   "manifest.webmanifest", "icons/icon-180.png", "icons/icon-512.png"
 ];
 

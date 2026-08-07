@@ -114,6 +114,22 @@ h3 { margin-bottom: 8px; }
   background: linear-gradient(135deg, var(--brand), var(--brand2));
   color: #fff; border: none;
 }
+.coursebtn {
+  background: linear-gradient(135deg, #2e7d5b, #4bb98a);
+  color: #fff; border: none;
+}
+.weekcard { display: block; width: 100%; text-align: left; cursor: pointer; }
+.weekcard b { display: block; margin-bottom: 2px; }
+.weekcard .sub { display: block; }
+.courseblock {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--line);
+}
+.courseblock:last-child { border-bottom: none; }
+.cb-icon { font-size: 1.5rem; }
+.cb-main { flex: 1; }
+.cb-main b { display: block; font-size: .95rem; }
+.btn.small { padding: 7px 12px; font-size: .85rem; width: auto; margin: 0; white-space: nowrap; text-decoration: none; }
 .talkmic {
   width: 92px; height: 92px; margin: 16px auto; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; font-size: 2.6rem;

@@ -29,6 +29,12 @@ const Speech = {
       ("webkitSpeechRecognition" in window || "SpeechRecognition" in window);
   },
 
+  // Is a Vietnamese text-to-speech voice installed on this device?
+  hasVoice(){
+    try { return speechSynthesis.getVoices().some(v => v.lang && v.lang.toLowerCase().startsWith("vi")); }
+    catch(e){ return false; }
+  },
+
   // Listen once; calls cb(transcripts) or errCb(err). lang defaults to Vietnamese.
   listen(cb, errCb, lang = "vi-VN"){
     const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;

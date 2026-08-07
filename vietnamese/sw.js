@@ -1,9 +1,9 @@
 // Service worker for the Vietnamese app. Scope: /espanolita/vietnamese/
-const CACHE = "tiengviet-v1";
+const CACHE = "tiengviet-v2";
 const ASSETS = [
   ".", "index.html", "css/style.css",
-  "js/data-vocab.js", "js/data-grammar.js",
-  "js/srs.js", "js/speech.js", "js/app.js", "js/extras.js",
+  "js/data-vocab.js", "js/data-grammar.js", "js/data-talk.js",
+  "js/srs.js", "js/speech.js", "js/app.js", "js/extras.js", "js/talk.js",
   "manifest.webmanifest", "icons/icon-180.png", "icons/icon-512.png"
 ];
 

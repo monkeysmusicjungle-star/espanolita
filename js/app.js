@@ -25,7 +25,8 @@ function go(view, arg){
   window.scrollTo(0, 0);
   const views = { home: viewHome, practice: () => startSession(), speak: viewSpeak, songs: viewSongs,
                   song: viewSong, addsong: viewAddSong, settings: viewSettings,
-                  crossword: viewCrossword, translate: viewTranslate, ai: viewAI, talk: viewTalk };
+                  crossword: viewCrossword, translate: viewTranslate, ai: viewAI, talk: viewTalk,
+                  course: viewCourse };
   (views[view] || viewHome)(arg);
   document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.v === view));
 }
@@ -115,6 +116,7 @@ function viewHome(){
     </div>
 
     <button class="btn big talkbtn" onclick="go('talk')">🗣️ Hands-free speaking tutor</button>
+    <button class="btn big coursebtn" onclick="go('course')">📘 5-Week Fluency Course (2 hrs/day)</button>
 
     <div class="card">
       <h3>Today's 30-Minute Plan (${doneCount}/5)</h3>

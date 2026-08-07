@@ -17,7 +17,9 @@ const State = {
       introduced: [],          // vocab ids in the order they were unlocked
       recent: [],              // last answers (1/0)
       stats: { answers: 0, correct: 0, days: {} },
-      plan: null
+      plan: null,
+      speakBand: 0            // hands-free tutor level: 0=A1 1=A2
+
     };
   },
 
