@@ -2,7 +2,7 @@
 "use strict";
 
 const TALK = { running: false, seq: 0, rec: null, queue: [], drill: null, attempt: 0, noHear: 0,
-               right: 0, wrong: 0, xpStart: 0, recMode: false };
+               right: 0, wrong: 0, xpStart: 0, recMode: false, recLang: "vi-VN" };
 const TALK_BANDS = ["A1", "A2"];
 
 // Keep the screen awake so the phone doesn't suspend the mic when set down.
@@ -124,6 +124,7 @@ function talkStart(){
   TALK.running = true;
   TALK.seq++;
   talkAcquireWake();
+  TALK.recLang = "vi-VN";
   TALK.recMode = !Speech.hasRecognition();
   TALK.right = 0; TALK.wrong = 0; TALK.xpStart = State.data.xp;
   TALK.queue = talkBuildQueue();
@@ -213,6 +214,12 @@ function talkListen(){
   }, err => {
     if (TALK.seq !== mySeq || !TALK.running) return;
     if (mic) mic.classList.remove("live");
+    // Some Android builds label the language "vi" rather than "vi-VN" — try that
+    // before giving up on live recognition.
+    if (err === "language-not-supported" && TALK.recLang === "vi-VN"){
+      TALK.recLang = "vi";
+      return talkListen();
+    }
     if (err === "not-allowed" || err === "service-not-allowed"){
       talkStatus("🚫 " + L("Allow the microphone, then Start again.","Permite el micrófono y pulsa Empezar."), "bad");
       TALK.running = false;
@@ -222,7 +229,7 @@ function talkListen(){
       return;
     }
     if (err === "language-not-supported"){
-      TALK.recMode = true;  // fall back to record & compare for the rest
+      TALK.recMode = true;  // no Vietnamese recognition here — record & compare instead
       return talkRecord();
     }
     // Transient (silence, screen sleep/wake) — keep re-listening a few times.
@@ -236,7 +243,7 @@ function talkListen(){
     document.getElementById("talk-fb").innerHTML =
       `<button class="btn big rec" onclick="TALK.noHear=0;talkAcquireWake();talkListen()">🎙️ ${L("Resume","Seguir")}</button>
        <button class="btn ghost" onclick="talkNext()">${L("Next","Siguiente")} →</button>`;
-  });
+  }, TALK.recLang);
 }
 
 /* --- record & compare fallback (no recognition) --- */
@@ -292,6 +299,7 @@ function talkGrade(alts){
     talkAdvanceBand();
     document.getElementById("talk-fb").innerHTML = `<div class="fbx good">
       <b>${pct >= 99 ? "🌟 " + L("Perfect!","¡Perfecto!") : "✅ " + L("Well done!","¡Muy bien!") + " " + pct + "%"}</b>
+      ${heard ? `<p class="sub">${L("I heard:","Oí:")} “${esc(heard)}”</p>` : ""}
       <p class="wordchips">${res.words.map(w => `<span class="${w.ok ? "ok" : "miss"}">${esc(w.w)}</span>`).join(" ")}</p></div>`;
     talkStatus("✅ " + L("Correct!","¡Correcto!"), "good");
     talkSpeak("Tốt lắm!", "vi-VN", () => { if (TALK.seq === mySeq) talkNext(); });
