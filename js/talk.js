@@ -3,7 +3,7 @@
 "use strict";
 
 const TALK = { running: false, seq: 0, rec: null, queue: [], drill: null, attempt: 0, noHear: 0,
-               right: 0, wrong: 0, xpStart: 0, mode: "think" };
+               right: 0, wrong: 0, xpStart: 0, mode: "think", missWords: {}, lastTricky: [] };
 const TALK_BANDS = ["A1", "A2", "B1", "B2"];
 
 // Keep the screen awake so Android doesn't suspend the microphone when you
@@ -30,7 +30,8 @@ function talkSpeak(text, lang, cb, rate){
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang;
     if (lang.indexOf("es") === 0 && Speech.voice) u.voice = Speech.voice;
-    u.rate = rate || 0.92;
+    u.rate = rate || 0.9;
+    u.pitch = lang.indexOf("es") === 0 ? 1.08 : 1;
     u.onend = finish;
     u.onerror = finish;
     speechSynthesis.speak(u);
@@ -73,7 +74,7 @@ function talkStart(mode){
   TALK.running = true;
   TALK.seq++;
   talkAcquireWake();
-  TALK.right = 0; TALK.wrong = 0; TALK.xpStart = State.data.xp;
+  TALK.right = 0; TALK.wrong = 0; TALK.xpStart = State.data.xp; TALK.missWords = {};
   TALK.queue = talkBuildQueue();
   talkNext();
 }
@@ -197,6 +198,15 @@ function talkGrade(alts){
   const heard = alts[0] || "";
   const mySeq = TALK.seq;
 
+  // Remember every word that slipped — even on a pass — for end-of-lesson coaching.
+  const origWords = d.es.split(/\s+/).map(w => w.replace(/[¿?¡!.,;:]/g, ""));
+  res.words.forEach((w, i) => {
+    if (!w.ok){
+      const e = TALK.missWords[w.w] || (TALK.missWords[w.w] = { count: 0, word: origWords[i] || w.w });
+      e.count++;
+    }
+  });
+
   if (res.score >= 0.6){
     TALK.right++;
     SRS.answer(d.id, true);
@@ -259,11 +269,19 @@ function talkSkip(){
   talkNext();
 }
 
+function talkSayTricky(){
+  if (TALK.lastTricky.length) talkSpeak(TALK.lastTricky.join(", "), "es-ES", null, 0.62);
+}
+
 function talkEnd(stopped){
   TALK.running = false;
   talkReleaseWake();
   const earned = State.data.xp - TALK.xpStart;
-  const total = TALK.right + TALK.wrong;
+  // Words to practise: the ones missed most this session (small slips included).
+  let tricky = Object.values(TALK.missWords).sort((a, b) => b.count - a.count);
+  tricky = (tricky.filter(e => e.count >= 2).length ? tricky.filter(e => e.count >= 2) : tricky).slice(0, 6);
+  TALK.lastTricky = tricky.map(e => e.word);
+
   APP.innerHTML = `<div class="screen center">
     <div class="hero">🗣️</div>
     <h1>${stopped ? "Session ended" : "¡Bien hecho!"}</h1>
@@ -272,8 +290,15 @@ function talkEnd(stopped){
       <div class="tile"><b>+${earned}</b><span>XP</span></div>
       <div class="tile"><b>${TALK_BANDS[State.data.speakBand || 0]}</b><span>level</span></div>
     </div>
+    ${TALK.lastTricky.length ? `<div class="card">
+      <h3>🎯 Words to practise</h3>
+      <p class="sub">These tripped you up a little. Here they are — tap to hear them slowly and repeat each one.</p>
+      <p class="wordchips">${TALK.lastTricky.map(w => `<span class="miss">${esc(w)}</span>`).join(" ")}</p>
+      <button class="btn" onclick="talkSayTricky()">🔊 Say them slowly</button>
+    </div>` : `<p class="sub center">✨ No trouble words this time — lovely and clear!</p>`}
     <p class="sub center">Come back tomorrow — the sentences you found hard will return until they feel easy.</p>
     <button class="btn big rec" onclick="talkStart()">▶️ Keep going</button>
     <button class="btn big ghost" onclick="go('home')">Done for now</button>
   </div>${navBar()}`;
+  if (TALK.lastTricky.length) setTimeout(talkSayTricky, 700);
 }

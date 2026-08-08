@@ -61,28 +61,40 @@ function setupA2English(){
 }
 
 /* ---------------- Daily plan ---------------- */
-// The recommended ~2-hour daily routine (matches the 5-week course blocks).
+// The recommended ~2-hour daily routine, in small tickable chunks.
 const PLAN_STEPS = [
-  { key: "speak",    icon: "🗣️", title: "Speaking — Think mode",           mins: 30, view: "talk" },
-  { key: "newwords", icon: "🎯", title: "Vocabulary + grammar",             mins: 25, view: "practice" },
-  { key: "input",    icon: "📺", title: "Watch / listen today",             mins: 30, link: true },
-  { key: "lola",     icon: "🤖", title: "Talk with Lola — Spanish only",    mins: 20, view: "ai" },
-  { key: "fun",      icon: "🎵", title: "Song, crossword or translate",     mins: 15, view: "songs" }
+  { key: "speak1",   icon: "🗣️", title: "Speaking — Think mode",        mins: 15 },
+  { key: "newwords", icon: "🎯", title: "New words",                    mins: 10 },
+  { key: "grammar",  icon: "📖", title: "Grammar pop-quiz",             mins: 10 },
+  { key: "input",    icon: "📺", title: "Watch today",                  mins: 15, link: "video" },
+  { key: "lola",     icon: "🤖", title: "Chat with Lola — Spanish only", mins: 15 },
+  { key: "speak2",   icon: "🗣️", title: "Speaking — round 2",           mins: 15 },
+  { key: "listen",   icon: "🎧", title: "Listen today",                 mins: 15, link: "audio" },
+  { key: "puzzle",   icon: "🧩", title: "Crossword or translate",       mins: 10 },
+  { key: "song",     icon: "🎵", title: "Song practice",                mins: 15 }
 ];
 function ensurePlanToday(){
   const t = new Date().toISOString().slice(0, 10);
   const d = State.data;
   if (!d.plan || d.plan.date !== t){
-    d.plan = { date: t, steps: { speak: false, newwords: false, input: false, lola: false, fun: false } };
+    const steps = {};
+    PLAN_STEPS.forEach(s => steps[s.key] = false);
+    d.plan = { date: t, steps };
     State.save();
   }
   return d.plan;
 }
-// Rotating "watch/listen today" pick — anchored on Dreaming Spanish (the top rec).
+// Rotating "watch today" (video) pick — anchored on Dreaming Spanish (the top rec).
 function todaysResource(){
   if (typeof RES === "undefined") return { label: "Dreaming Spanish", url: "https://www.dreamingspanish.com/" };
-  const wk = [RES.dreaming, RES.langtrans, RES.coffee, RES.dreaming, RES.notes, RES.dreaming, RES.slow];
+  const wk = [RES.dreaming, RES.butterfly, RES.dreaming, RES.juan, RES.dreaming, RES.dreaming, RES.juan];
   return wk[new Date().getDay()] || RES.dreaming;
+}
+// Rotating "listen today" (audio) pick.
+function todaysAudio(){
+  if (typeof RES === "undefined") return { label: "Language Transfer", url: "https://www.languagetransfer.org/" };
+  const wk = [RES.langtrans, RES.coffee, RES.langtrans, RES.coffee, RES.notes, RES.langtrans, RES.slow];
+  return wk[new Date().getDay()] || RES.langtrans;
 }
 function togglePlanStep(key){
   const plan = ensurePlanToday();
@@ -105,10 +117,12 @@ function pickTodaysSongId(){
   return list[day % list.length].id;
 }
 function startPlanStep(step){
-  if (step === "speak"){ return go("talk"); }
+  if (step === "speak1" || step === "speak2"){ return go("talk"); }
   if (step === "lola"){ return go("ai"); }
-  if (step === "fun"){ return go("songs"); }
-  return startSession(step);   // "newwords" runs a vocab+grammar session (auto-ticks on finish)
+  if (step === "song"){ return go("songs"); }
+  if (step === "puzzle"){ return go("crossword"); }
+  if (step === "grammar"){ return startSession("grammar"); }  // auto-ticks on finish
+  return startSession(step);   // "newwords" — auto-ticks on finish
 }
 
 /* ---------------- Home (index) ---------------- */
@@ -136,13 +150,14 @@ function viewHome(){
     <button class="btn big coursebtn" onclick="go('course')">📘 5-Week Fluency Course</button>
 
     <div class="card">
-      <h3>Today's Plan · ~2 hours (${doneCount}/5)</h3>
-      <div class="progress"><div style="width:${(doneCount / 5) * 100}%"></div></div>
+      <h3>Today's Plan · ~2 hours (${doneCount}/${PLAN_STEPS.length})</h3>
+      <div class="progress"><div style="width:${(doneCount / PLAN_STEPS.length) * 100}%"></div></div>
       ${PLAN_STEPS.map(s => {
         const done = plan.steps[s.key];
-        const label = s.link ? s.title + ": " + res.label : s.title;
+        const r = s.link === "audio" ? todaysAudio() : res;
+        const label = s.link ? s.title + ": " + r.label : s.title;
         const action = s.link
-          ? `<a class="btn small" href="${res.url}" target="_blank" rel="noopener">Open ↗</a>`
+          ? `<a class="btn small" href="${r.url}" target="_blank" rel="noopener">Open ↗</a>`
           : `<button class="btn small" onclick="startPlanStep('${s.key}')">Do it →</button>`;
         return `<div class="courseblock">
           <span class="cb-icon">${done ? "✅" : s.icon}</span>
@@ -151,7 +166,7 @@ function viewHome(){
           <button class="tickbtn" onclick="togglePlanStep('${s.key}')" title="Mark done">${done ? "☑️" : "⬜"}</button>
         </div>`;
       }).join("")}
-      ${doneCount === 5 ? `<p class="sub center">🎉 Two hours done — brilliant!</p>` : ""}
+      ${doneCount === PLAN_STEPS.length ? `<p class="sub center">🎉 Two hours done — brilliant!</p>` : ""}
     </div>
 
     <h3 class="indexTitle">Or choose freely</h3>

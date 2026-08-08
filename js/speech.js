@@ -7,20 +7,31 @@ const Speech = {
   init(){
     const pick = () => {
       const vs = speechSynthesis.getVoices().filter(v => v.lang && v.lang.toLowerCase().startsWith("es"));
-      // Prefer Spain/Mexico voices, then any Spanish one.
-      this.voice = vs.find(v => /es[-_](ES|MX)/i.test(v.lang)) || vs[0] || null;
+      // Prefer the most natural, warm voices: Google / neural, then female.
+      const score = v => {
+        const n = (v.name || "").toLowerCase();
+        let s = 0;
+        if (/google/.test(n)) s += 5;
+        if (/natural|neural|enhanced|premium/.test(n)) s += 3;
+        if (/female|mujer|m[oó]nica|paulina|marisol|helena|luc[ií]a|sabina|elena/.test(n)) s += 2;
+        if (/es[-_](es|us|mx)/i.test(v.lang)) s += 1;
+        return s;
+      };
+      this.voice = vs.slice().sort((a, b) => score(b) - score(a))[0] || null;
     };
     pick();
     if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = pick;
   },
 
-  say(text, rate = 0.92){
+  // Softer, gentler default: slightly slower and a touch warmer in pitch.
+  say(text, rate = 0.9){
     try {
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "es-ES";
       if (this.voice) u.voice = this.voice;
       u.rate = rate;
+      u.pitch = 1.08;
       speechSynthesis.speak(u);
     } catch(e){}
   },
