@@ -2,16 +2,15 @@
 // Mixes in-app activities with links to free external resources.
 "use strict";
 
-// Trusted free resources (stable homepages / channels).
+// Free-only resources (all free to watch/listen — no subscriptions).
 const RES = {
-  dreaming:   { label: "Dreaming Spanish (easy videos)", url: "https://www.dreamingspanish.com/" },
-  langtrans:  { label: "Language Transfer (free audio course)", url: "https://www.languagetransfer.org/" },
-  coffee:     { label: "Coffee Break Spanish (podcast)", url: "https://coffeebreaklanguages.com/coffeebreakspanish/" },
-  notes:      { label: "Notes in Spanish (podcast)", url: "https://www.notesinspanish.com/" },
-  slow:       { label: "News in Slow Spanish", url: "https://www.newsinslowspanish.com/" },
-  butterfly:  { label: "Butterfly Spanish (YouTube)", url: "https://www.youtube.com/results?search_query=butterfly+spanish" },
-  juan:       { label: "Español con Juan (YouTube)", url: "https://www.youtube.com/results?search_query=espanol+con+juan" },
-  music:      { label: "Spanish music playlist (YouTube)", url: "https://www.youtube.com/results?search_query=canciones+en+espanol+faciles" }
+  dreaming:   { label: "Dreaming Spanish — free videos (YouTube)", url: "https://www.youtube.com/results?search_query=dreaming+spanish+super+beginner" },
+  langtrans:  { label: "Language Transfer — free audio course", url: "https://www.languagetransfer.org/" },
+  coffee:     { label: "Coffee Break Spanish — free podcast (YouTube)", url: "https://www.youtube.com/results?search_query=coffee+break+spanish+season+1" },
+  notes:      { label: "Notes in Spanish — free podcast (YouTube)", url: "https://www.youtube.com/results?search_query=notes+in+spanish+beginners" },
+  butterfly:  { label: "Butterfly Spanish — free lessons (YouTube)", url: "https://www.youtube.com/results?search_query=butterfly+spanish+lessons" },
+  juan:       { label: "Español con Juan — free videos (YouTube)", url: "https://www.youtube.com/results?search_query=espanol+con+juan+principiantes" },
+  music:      { label: "Easy Spanish songs (YouTube)", url: "https://www.youtube.com/results?search_query=canciones+en+espanol+faciles+con+letra" }
 };
 
 const COURSE = [
@@ -33,7 +32,7 @@ const COURSE = [
     tip: "In the AI chat with Lola, refuse to switch to English — push through in Spanish." },
   { n: 5, level: "B1→B2", theme: "Fluency",
     goal: "Real conversation, subjunctive basics, reacting naturally, faster speech.",
-    input: RES.juan, audio: RES.slow,
+    input: RES.juan, audio: RES.notes,
     tip: "Aim to speak without pausing to translate in your head. Speed over perfection." }
 ];
 

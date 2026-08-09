@@ -138,6 +138,19 @@ h3 { margin-bottom: 8px; }
 .cb-main { flex: 1; }
 .cb-main b { display: block; font-size: .95rem; }
 .btn.small { padding: 7px 12px; font-size: .85rem; width: auto; margin: 0; white-space: nowrap; text-decoration: none; }
+.lessonline { font-size: 1.1rem; line-height: 1.5; margin-bottom: 8px; }
+.lessonctrls { display: flex; gap: 10px; align-items: center; justify-content: center; }
+.lessonctrls .btn { width: auto; margin: 0; }
+.lessonctrls .btn.big { flex: 1; }
+
+.levelrow { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 8px 0; }
+.levelchip {
+  flex: 1; min-width: 60px; padding: 12px 8px; border-radius: 12px; cursor: pointer;
+  border: 2px solid var(--line); background: var(--card); color: var(--ink);
+  font-weight: 700; font-family: inherit; font-size: 1rem;
+}
+.levelchip.on { border-color: var(--brand); background: var(--brand); color: #fff; }
+
 .talkmic {
   width: 92px; height: 92px; margin: 16px auto; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; font-size: 2.6rem;

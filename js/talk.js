@@ -3,8 +3,10 @@
 "use strict";
 
 const TALK = { running: false, seq: 0, rec: null, queue: [], drill: null, attempt: 0, noHear: 0,
-               right: 0, wrong: 0, xpStart: 0, mode: "think", missWords: {}, lastTricky: [] };
+               right: 0, wrong: 0, xpStart: 0, mode: "think", missWords: {}, lastTricky: [], level: "auto" };
 const TALK_BANDS = ["A1", "A2", "B1", "B2"];
+// Slower for easier levels; speeds up as she climbs toward B2 over the weeks.
+const TALK_RATE = { A1: 0.68, A2: 0.76, B1: 0.85, B2: 0.92 };
 
 // Keep the screen awake so Android doesn't suspend the microphone when you
 // put the phone down. Wake locks drop when the page is hidden, so re-acquire
@@ -45,32 +47,51 @@ function talkStatus(msg, cls){
 }
 
 /* ---------- Intro screen ---------- */
+function talkSetLevel(l){
+  TALK.level = l;
+  State.data.speakLevel = l;
+  State.save();
+  viewTalk();
+}
+
 function viewTalk(){
+  if (!TALK.level) TALK.level = State.data.speakLevel || "auto";
   const band = TALK_BANDS[State.data.speakBand || 0];
   const mastered = DRILLS.filter(d => (State.data.items[d.id] || {}).ivl >= 3).length;
+  const sel = TALK.level;
+  const levels = ["auto", "A1", "A2", "B1", "B2"];
   APP.innerHTML = `<div class="screen">
     <button class="back" onclick="go('home')">← Home</button>
     <h1>🗣️ Hands-free speaking tutor</h1>
     <div class="card">
-      <p><b>Put your phone down and just talk.</b> I'll ask you to say a sentence in Spanish,
-      listen, and help you fix it — automatically, no tapping. It gets harder as you improve,
-      from A1 all the way to B2.</p>
-      <p class="sub">Your level now: <b>${band}</b> · ${mastered} sentences mastered</p>
+      <p><b>Put your phone down and just talk.</b> I say a sentence, you say it back in Spanish,
+      and I help you fix it — no tapping. Lots of repetition, and it only speeds up once you've really got it.</p>
+      <p class="sub">Auto level now: <b>${band}</b> · ${mastered} sentences mastered</p>
     </div>
     <div class="card">
-      <h3>Choose how you practise</h3>
-      <p class="sub">🧠 <b>Think mode</b> — I ask in English, you say it in Spanish yourself. Builds real fluency.</p>
-      <button class="btn big rec" onclick="talkStart('think')">🧠 Think in Spanish (recommended)</button>
-      <p class="sub">🔁 <b>Repeat mode</b> — see the Spanish and say it. Good for new or tricky sentences.</p>
-      <button class="btn big ghost" onclick="talkStart('repeat')">🔁 See & repeat</button>
+      <h3>Choose your level</h3>
+      <div class="levelrow">
+        ${levels.map(l => `<button class="levelchip ${sel === l ? "on" : ""}" onclick="talkSetLevel('${l}')">${l === "auto" ? "Auto ✨" : l}</button>`).join("")}
+      </div>
+      <p class="sub">${sel === "auto"
+        ? "Auto starts easy (A1) and moves up to B2 only when you've mastered each level — with lots of easier review mixed in."
+        : "Locked to <b>" + sel + "</b> — you'll stay here (with a little easier review) until you switch."}</p>
     </div>
-    <p class="sub center">Works best in Chrome on Android. When it asks, tap <b>Allow</b> for the microphone. The screen stays awake while you practise, so you can set the phone down. Tap <b>Stop</b> anytime.</p>
+    <div class="card">
+      <h3>How to practise</h3>
+      <p class="sub">🧠 <b>Think mode</b> — I ask in English, you say it in Spanish yourself.</p>
+      <button class="btn big rec" onclick="talkStart('think')">🧠 Think in Spanish</button>
+      <p class="sub">🔁 <b>Repeat mode</b> — see &amp; hear the Spanish, then say it. Best for starting out.</p>
+      <button class="btn big ghost" onclick="talkStart('repeat')">🔁 See &amp; repeat</button>
+    </div>
+    <p class="sub center">Works best in Chrome on Android. Tap <b>Allow</b> for the microphone. The screen stays awake, so set the phone down. Tap <b>Stop</b> anytime.</p>
   </div>${navBar()}`;
 }
 
 /* ---------- Session control ---------- */
 function talkStart(mode){
   TALK.mode = mode || TALK.mode || "think";
+  TALK.level = TALK.level || State.data.speakLevel || "auto";
   TALK.running = true;
   TALK.seq++;
   talkAcquireWake();
@@ -79,20 +100,31 @@ function talkStart(mode){
   talkNext();
 }
 
+// Which levels this session draws from, and the "new-words" target level.
+function talkBands(){
+  const lvl = TALK.level || "auto";
+  if (lvl === "auto"){
+    const max = State.data.speakBand || 0;
+    return { bands: TALK_BANDS.slice(0, max + 1), target: TALK_BANDS[max] };
+  }
+  const i = TALK_BANDS.indexOf(lvl);
+  return { bands: i > 0 ? [TALK_BANDS[i - 1], lvl] : [lvl], target: lvl };
+}
+
 function talkBuildQueue(){
   const t = todayNum();
+  const { bands, target } = talkBands();
+  // Review-heavy: due sentences within the chosen band(s) come first...
   const due = Object.keys(State.data.items)
     .filter(id => id.startsWith("d") && State.data.items[id].due <= t)
-    .map(id => DRILL_BY_ID[id]).filter(Boolean);
-  let band = State.data.speakBand || 0;
-  const fresh = [];
-  while (fresh.length < 8 && band < TALK_BANDS.length){
-    const pool = DRILLS.filter(d => d.lv === TALK_BANDS[band] && !State.data.items[d.id]);
-    for (const d of pool){ if (fresh.length >= 8) break; fresh.push(d); }
-    if (fresh.length < 8) band++;
-  }
-  const q = shuffle([...sample(due, 12), ...fresh]);
-  return q.length ? q : shuffle(DRILLS.filter(d => d.lv === TALK_BANDS[State.data.speakBand || 0])).slice(0, 8);
+    .map(id => DRILL_BY_ID[id]).filter(d => d && bands.indexOf(d.lv) >= 0);
+  // ...plus only a few genuinely new sentences from the target level.
+  const fresh = DRILLS.filter(d => d.lv === target && !State.data.items[d.id]).slice(0, 4);
+  // A little easier-level review so it keeps circling back to simpler things.
+  const easier = shuffle(DRILLS.filter(d => bands.indexOf(d.lv) >= 0 && bands.indexOf(d.lv) < bands.length - 1
+    && State.data.items[d.id])).slice(0, 4);
+  const q = shuffle([...sample(due, 12), ...easier, ...fresh]);
+  return q.length ? q : shuffle(DRILLS.filter(d => d.lv === target)).slice(0, 8);
 }
 
 function talkStop(){
@@ -115,13 +147,16 @@ function talkNext(){
   talkPrompt();
 }
 
-// A1→B2 progression: move up once ~80% of the current band has been practiced.
+// Gentle A1→B2 progression: only move up once you've truly MASTERED most of the
+// current band (got them right several times, ivl>=3) — not just seen them.
+// A locked level never auto-advances.
 function talkAdvanceBand(){
+  if ((TALK.level || "auto") !== "auto") return;
   let b = State.data.speakBand || 0;
   if (b >= 3) return;
   const cur = DRILLS.filter(d => d.lv === TALK_BANDS[b]);
-  const seen = cur.filter(d => State.data.items[d.id]).length;
-  if (seen / cur.length >= 0.8){ State.data.speakBand = b + 1; State.save(); }
+  const mastered = cur.filter(d => (State.data.items[d.id] || {}).ivl >= 3).length;
+  if (mastered / cur.length >= 0.8){ State.data.speakBand = b + 1; State.save(); }
 }
 
 /* ---------- One drill ---------- */
@@ -148,10 +183,15 @@ function talkPrompt(retry){
     <button class="btn ghost" onclick="talkSkip()">Skip →</button>
   </div>${navBar()}`;
 
-  // Speak the cue, then start listening.
+  // Speak the cue, then start listening. Easier levels are read more slowly.
+  const r = TALK_RATE[d.lv] || 0.85;
   talkStatus("🔊 Speaking…", "");
   if (show){
-    talkSpeak(d.es, "es-ES", () => { if (TALK.seq === mySeq) talkListen(); });
+    // Repeat mode: say it slowly twice so she can really hear it before repeating.
+    talkSpeak(d.es, "es-ES", () => {
+      if (TALK.seq !== mySeq) return;
+      talkSpeak(d.es, "es-ES", () => { if (TALK.seq === mySeq) talkListen(); }, r);
+    }, r);
   } else {
     talkSpeak("In Spanish, say. " + d.en, "en-US", () => { if (TALK.seq === mySeq) talkListen(); });
   }

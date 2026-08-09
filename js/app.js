@@ -26,7 +26,7 @@ function go(view, arg){
   const views = { home: viewHome, practice: () => startSession(), speak: viewSpeak, songs: viewSongs,
                   song: viewSong, addsong: viewAddSong, settings: viewSettings,
                   crossword: viewCrossword, translate: viewTranslate, ai: viewAI, talk: viewTalk,
-                  course: viewCourse };
+                  course: viewCourse, lessons: viewLessons };
   (views[view] || viewHome)(arg);
   document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.v === view));
 }
@@ -65,11 +65,11 @@ function setupA2English(){
 const PLAN_STEPS = [
   { key: "speak1",   icon: "🗣️", title: "Speaking — Think mode",        mins: 15 },
   { key: "newwords", icon: "🎯", title: "New words",                    mins: 10 },
-  { key: "grammar",  icon: "📖", title: "Grammar pop-quiz",             mins: 10 },
+  { key: "glesson",  icon: "🧠", title: "Grammar lesson (spoken)",      mins: 15 },
   { key: "input",    icon: "📺", title: "Watch today",                  mins: 15, link: "video" },
   { key: "lola",     icon: "🤖", title: "Chat with Lola — Spanish only", mins: 15 },
   { key: "speak2",   icon: "🗣️", title: "Speaking — round 2",           mins: 15 },
-  { key: "listen",   icon: "🎧", title: "Listen today",                 mins: 15, link: "audio" },
+  { key: "listen",   icon: "🎧", title: "Listen today",                 mins: 10, link: "audio" },
   { key: "puzzle",   icon: "🧩", title: "Crossword or translate",       mins: 10 },
   { key: "song",     icon: "🎵", title: "Song practice",                mins: 15 }
 ];
@@ -93,7 +93,7 @@ function todaysResource(){
 // Rotating "listen today" (audio) pick.
 function todaysAudio(){
   if (typeof RES === "undefined") return { label: "Language Transfer", url: "https://www.languagetransfer.org/" };
-  const wk = [RES.langtrans, RES.coffee, RES.langtrans, RES.coffee, RES.notes, RES.langtrans, RES.slow];
+  const wk = [RES.langtrans, RES.coffee, RES.langtrans, RES.coffee, RES.notes, RES.langtrans, RES.notes];
   return wk[new Date().getDay()] || RES.langtrans;
 }
 function togglePlanStep(key){
@@ -121,7 +121,7 @@ function startPlanStep(step){
   if (step === "lola"){ return go("ai"); }
   if (step === "song"){ return go("songs"); }
   if (step === "puzzle"){ return go("crossword"); }
-  if (step === "grammar"){ return startSession("grammar"); }  // auto-ticks on finish
+  if (step === "glesson"){ return go("lessons"); }
   return startSession(step);   // "newwords" — auto-ticks on finish
 }
 
