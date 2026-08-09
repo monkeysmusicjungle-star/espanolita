@@ -5,14 +5,14 @@
 let xw = null;
 
 function xwCandidates(){
-  const pool = State.data.introduced.map(id => VOCAB_BY_ID[id]).filter(Boolean);
-  const src = pool.length >= 12 ? pool : VOCAB.filter(v => v.lv === "A1" || v.lv === "A2");
+  // Draw from a broad pool (A1–B1) so puzzles vary a lot; single-word answers only.
+  const src = VOCAB.filter(v => v.lv === "A1" || v.lv === "A2" || v.lv === "B1");
   const seen = new Set();
   const out = [];
   for (const v of shuffle(src)){
     const bare = v.es.replace(/^(el|la|los|las|un|una)\s+/i, "").split(/[\s,\/]/)[0];
     const ans = Speech.norm(bare).replace(/\s/g, "").toUpperCase();
-    if (ans.length < 3 || ans.length > 11 || seen.has(ans)) continue;
+    if (ans.length < 3 || ans.length > 11 || seen.has(ans) || !/^[A-Z]+$/.test(ans)) continue;
     seen.add(ans);
     out.push({ ans, clue: v.en, es: v.es });
   }
@@ -21,7 +21,8 @@ function xwCandidates(){
 
 function buildCrossword(){
   const SIZE = 21;
-  const cands = xwCandidates().sort((a, b) => b.ans.length - a.ans.length);
+  // Randomly pick a subset each time (then sort for placement) so every puzzle differs.
+  const cands = sample(xwCandidates(), 18).sort((a, b) => b.ans.length - a.ans.length);
   const cells = {};
   const words = [];
   const key = (r, c) => r + "," + c;

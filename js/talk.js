@@ -66,7 +66,7 @@ function viewTalk(){
     <div class="card">
       <p><b>Put your phone down and just talk.</b> I say a sentence, you say it back in Spanish,
       and I help you fix it — no tapping. Lots of repetition, and it only speeds up once you've really got it.</p>
-      <p class="sub">Auto level now: <b>${band}</b> · ${mastered} sentences mastered</p>
+      <p class="sub">Practising at: <b>${sel === "auto" ? "Auto (" + band + ")" : sel}</b> · ${mastered} sentences mastered</p>
     </div>
     <div class="card">
       <h3>Choose your level</h3>
@@ -114,16 +114,21 @@ function talkBands(){
 function talkBuildQueue(){
   const t = todayNum();
   const { bands, target } = talkBands();
-  // Review-heavy: due sentences within the chosen band(s) come first...
-  const due = Object.keys(State.data.items)
-    .filter(id => id.startsWith("d") && State.data.items[id].due <= t)
-    .map(id => DRILL_BY_ID[id]).filter(d => d && bands.indexOf(d.lv) >= 0);
-  // ...plus only a few genuinely new sentences from the target level.
-  const fresh = DRILLS.filter(d => d.lv === target && !State.data.items[d.id]).slice(0, 4);
-  // A little easier-level review so it keeps circling back to simpler things.
-  const easier = shuffle(DRILLS.filter(d => bands.indexOf(d.lv) >= 0 && bands.indexOf(d.lv) < bands.length - 1
-    && State.data.items[d.id])).slice(0, 4);
-  const q = shuffle([...sample(due, 12), ...easier, ...fresh]);
+  const locked = (TALK.level || "auto") !== "auto";
+
+  // The TARGET level leads the session (so picking A2 really means A2):
+  // a mix of new target sentences + target sentences due for review.
+  const targetNew = shuffle(DRILLS.filter(d => d.lv === target && !State.data.items[d.id]));
+  const targetDue = shuffle(DRILLS.filter(d => d.lv === target && State.data.items[d.id]
+    && State.data.items[d.id].due <= t));
+  const targetBlock = [...targetNew.slice(0, locked ? 8 : 4), ...targetDue.slice(0, 8)];
+
+  // Plus a smaller amount of easier-level review so it circles back to simpler things.
+  const easier = shuffle(DRILLS.filter(d => d.lv !== target && bands.indexOf(d.lv) >= 0
+    && State.data.items[d.id] && State.data.items[d.id].due <= t)).slice(0, locked ? 4 : 8);
+
+  const q = shuffle([...targetBlock, ...easier]);
+  // Fallback: if nothing scheduled yet, just serve fresh target sentences.
   return q.length ? q : shuffle(DRILLS.filter(d => d.lv === target)).slice(0, 8);
 }
 
@@ -187,11 +192,13 @@ function talkPrompt(retry){
   const r = TALK_RATE[d.lv] || 0.85;
   talkStatus("🔊 Speaking…", "");
   if (show){
-    // Repeat mode: say it slowly twice so she can really hear it before repeating.
+    // Repeat mode: say it slowly ONCE, then pause so she can get ready — not rushed.
+    const slow = Math.max(0.58, r - 0.08);
     talkSpeak(d.es, "es-ES", () => {
-      if (TALK.seq !== mySeq) return;
-      talkSpeak(d.es, "es-ES", () => { if (TALK.seq === mySeq) talkListen(); }, r);
-    }, r);
+      if (TALK.seq !== mySeq || !TALK.running) return;
+      talkStatus("🔁 Now you — say it", "");
+      setTimeout(() => { if (TALK.seq === mySeq && TALK.running) talkListen(); }, 1600);
+    }, slow);
   } else {
     talkSpeak("In Spanish, say. " + d.en, "en-US", () => { if (TALK.seq === mySeq) talkListen(); });
   }
