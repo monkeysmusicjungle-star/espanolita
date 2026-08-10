@@ -3,7 +3,8 @@
 "use strict";
 
 const TALK = { running: false, seq: 0, rec: null, queue: [], drill: null, attempt: 0, noHear: 0,
-               right: 0, wrong: 0, xpStart: 0, mode: "think", missWords: {}, lastTricky: [], level: "auto" };
+               right: 0, wrong: 0, xpStart: 0, mode: "think", missWords: {}, lastTricky: [],
+               level: "auto", topic: "all" };
 const TALK_BANDS = ["A1", "A2", "B1", "B2"];
 // Slower for easier levels; speeds up as she climbs toward B2 over the weeks.
 const TALK_RATE = { A1: 0.68, A2: 0.76, B1: 0.85, B2: 0.92 };
@@ -32,13 +33,30 @@ function talkSpeak(text, lang, cb, rate){
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang;
     if (lang.indexOf("es") === 0 && Speech.voice) u.voice = Speech.voice;
-    u.rate = rate || 0.9;
-    u.pitch = lang.indexOf("es") === 0 ? 1.08 : 1;
+    u.rate = rate || 0.88;
+    u.pitch = 1.08;   // the same warm, chill voice for every prompt and language
     u.onend = finish;
     u.onerror = finish;
     speechSynthesis.speak(u);
-    setTimeout(finish, Math.min(12000, 1800 + text.length * 110));
+    setTimeout(finish, Math.min(14000, 2200 + text.length * 130));
   } catch(e){ finish(); }
+}
+
+// Speak a list of phrases one after another with a pause between each, then
+// call doneCb. Lets the tutor correct slowly, one wrong word at a time.
+function talkSpeakSeq(items, doneCb){
+  const mySeq = TALK.seq;
+  let i = 0;
+  const step = () => {
+    if (TALK.seq !== mySeq || !TALK.running) return;
+    if (i >= items.length) return doneCb && doneCb();
+    const it = items[i++];
+    talkSpeak(it.text, it.lang || "es-ES", () => {
+      if (TALK.seq !== mySeq || !TALK.running) return;
+      setTimeout(step, it.pause || 900);
+    }, it.rate);
+  };
+  step();
 }
 
 function talkStatus(msg, cls){
@@ -53,9 +71,15 @@ function talkSetLevel(l){
   State.save();
   viewTalk();
 }
+function talkSetTopic(t){
+  TALK.topic = t;
+  State.data.speakTopic = t;
+  State.save();
+}
 
 function viewTalk(){
   if (!TALK.level) TALK.level = State.data.speakLevel || "auto";
+  if (!TALK.topic) TALK.topic = State.data.speakTopic || "all";
   const band = TALK_BANDS[State.data.speakBand || 0];
   const mastered = DRILLS.filter(d => (State.data.items[d.id] || {}).ivl >= 3).length;
   const sel = TALK.level;
@@ -78,6 +102,14 @@ function viewTalk(){
         : "Locked to <b>" + sel + "</b> — you'll stay here (with a little easier review) until you switch."}</p>
     </div>
     <div class="card">
+      <h3>Choose a topic</h3>
+      <select class="tin" onchange="talkSetTopic(this.value)">
+        <option value="all" ${TALK.topic === "all" ? "selected" : ""}>🎲 All topics (mixed)</option>
+        ${TALK_TOPICS.map(t => `<option value="${t.key}" ${TALK.topic === t.key ? "selected" : ""}>${t.icon} ${t.label}</option>`).join("")}
+      </select>
+      <p class="sub">Practise a whole topic — food, travel, work… or leave it on “All”.</p>
+    </div>
+    <div class="card">
       <h3>How to practise</h3>
       <p class="sub">🧠 <b>Think mode</b> — I ask in English, you say it in Spanish yourself.</p>
       <button class="btn big rec" onclick="talkStart('think')">🧠 Think in Spanish</button>
@@ -92,6 +124,7 @@ function viewTalk(){
 function talkStart(mode){
   TALK.mode = mode || TALK.mode || "think";
   TALK.level = TALK.level || State.data.speakLevel || "auto";
+  TALK.topic = TALK.topic || State.data.speakTopic || "all";
   TALK.running = true;
   TALK.seq++;
   talkAcquireWake();
@@ -115,21 +148,22 @@ function talkBuildQueue(){
   const t = todayNum();
   const { bands, target } = talkBands();
   const locked = (TALK.level || "auto") !== "auto";
+  const okTopic = d => (TALK.topic || "all") === "all" || d.topic === TALK.topic;
 
   // The TARGET level leads the session (so picking A2 really means A2):
   // a mix of new target sentences + target sentences due for review.
-  const targetNew = shuffle(DRILLS.filter(d => d.lv === target && !State.data.items[d.id]));
-  const targetDue = shuffle(DRILLS.filter(d => d.lv === target && State.data.items[d.id]
+  const targetNew = shuffle(DRILLS.filter(d => d.lv === target && okTopic(d) && !State.data.items[d.id]));
+  const targetDue = shuffle(DRILLS.filter(d => d.lv === target && okTopic(d) && State.data.items[d.id]
     && State.data.items[d.id].due <= t));
   const targetBlock = [...targetNew.slice(0, locked ? 8 : 4), ...targetDue.slice(0, 8)];
 
   // Plus a smaller amount of easier-level review so it circles back to simpler things.
-  const easier = shuffle(DRILLS.filter(d => d.lv !== target && bands.indexOf(d.lv) >= 0
+  const easier = shuffle(DRILLS.filter(d => d.lv !== target && bands.indexOf(d.lv) >= 0 && okTopic(d)
     && State.data.items[d.id] && State.data.items[d.id].due <= t)).slice(0, locked ? 4 : 8);
 
   const q = shuffle([...targetBlock, ...easier]);
-  // Fallback: if nothing scheduled yet, just serve fresh target sentences.
-  return q.length ? q : shuffle(DRILLS.filter(d => d.lv === target)).slice(0, 8);
+  // Fallback: if nothing scheduled yet, just serve fresh target sentences (of the topic).
+  return q.length ? q : shuffle(DRILLS.filter(d => d.lv === target && okTopic(d))).slice(0, 8);
 }
 
 function talkStop(){
@@ -266,27 +300,44 @@ function talkGrade(alts){
     return;
   }
 
-  // Wrong: explain which words, replay the model, retry (up to 3 attempts).
+  // Wrong: correct slowly — name each wrong word out loud, then the whole
+  // sentence, with pauses. Keep trying until it's right (up to 5 tries).
   TALK.attempt++;
   const missed = res.words.filter(w => !w.ok).map(w => w.w);
+  const missedOrig = res.words.map((w, i) => w.ok ? null : (origWords[i] || w.w)).filter(Boolean);
   const tips = talkWordTips(missed);
   document.getElementById("talk-fb").innerHTML = `<div class="fbx bad">
-    <b>Almost — ${pct}%</b>
+    <b>Almost — ${pct}% · try ${TALK.attempt}</b>
     <p class="sub">I heard: “${esc(heard)}”</p>
     <p class="wordchips">${res.words.map(w => `<span class="${w.ok ? "ok" : "miss"}">${esc(w.w)}</span>`).join(" ")}</p>
+    <p class="sub">Still to fix: <b>${missedOrig.length ? esc(missedOrig.join(", ")) : "—"}</b></p>
     <p class="sub">The sentence: <b>${esc(d.es)}</b></p>
     ${tips ? `<p class="sub">Focus on: ${tips}</p>` : ""}</div>`;
 
-  if (TALK.attempt >= 3){
+  const MAX = 5;
+  if (TALK.attempt >= MAX){
     TALK.wrong++;
     SRS.answer(d.id, false);
     talkStatus("Let's move on — you'll see this again.", "");
-    talkSpeak("La frase es: " + d.es, "es-ES", () => {
-      if (TALK.seq === mySeq) talkSpeak("Let's move on.", "en-US", () => { if (TALK.seq === mySeq) talkNext(); });
-    }, 0.75);
+    talkSpeakSeq([
+      { text: "No pasa nada. La frase es:", rate: 0.82, pause: 800 },
+      { text: d.es, rate: 0.58, pause: 1600 },
+      { text: d.es, rate: 0.58, pause: 1200 }
+    ], () => { if (TALK.seq === mySeq) talkNext(); });
   } else {
-    talkStatus("🔁 Listen and try again", "");
-    talkSpeak("Casi. Escucha. " + d.es, "es-ES", () => { if (TALK.seq === mySeq) talkPrompt(true); }, 0.72);
+    talkStatus("🔁 Listen carefully and try again", "");
+    // Say each wrong word out loud (slowly, twice), then the full sentence slowly.
+    const seq = [{ text: "Casi. Escucha bien.", rate: 0.82, pause: 1000 }];
+    if (missedOrig.length){
+      seq.push({ text: "Esta palabra:", rate: 0.82, pause: 500 });
+      missedOrig.slice(0, 3).forEach(w => {
+        seq.push({ text: w, rate: 0.5, pause: 900 });
+        seq.push({ text: w, rate: 0.5, pause: 1100 });
+      });
+    }
+    seq.push({ text: "Ahora la frase entera:", rate: 0.82, pause: 500 });
+    seq.push({ text: d.es, rate: 0.58, pause: 1700 });
+    talkSpeakSeq(seq, () => { if (TALK.seq === mySeq) talkPrompt(true); });
   }
 }
 

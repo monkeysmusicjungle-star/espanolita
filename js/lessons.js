@@ -139,8 +139,8 @@ function lessonSpeak(text, lang, cb, rate){
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang;
     if (lang.indexOf("es") === 0 && Speech.voice) u.voice = Speech.voice;
-    u.rate = rate || 0.95;
-    u.pitch = lang.indexOf("es") === 0 ? 1.08 : 1;
+    u.rate = rate || 0.92;
+    u.pitch = 1.08;   // same warm voice for English and Spanish
     u.onend = finish; u.onerror = finish;
     speechSynthesis.speak(u);
     setTimeout(finish, Math.min(14000, 2000 + text.length * 95));
